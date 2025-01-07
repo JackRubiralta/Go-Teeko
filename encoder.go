@@ -4,17 +4,6 @@ import (
 	"log"
 )
 
-// temporary
-var binomialTable = func() [26][26]int {
-	var table [26][26]int
-	for i := 0; i <= 25; i++ {
-		table[i][0] = 1
-		for j := 1; j <= i; j++ {
-			table[i][j] = table[i-1][j-1] + table[i-1][j]
-		}
-	}
-	return table
-}()
 
 
 func rankCombination(subset []int, n int) int {

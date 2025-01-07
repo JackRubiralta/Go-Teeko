@@ -19,33 +19,23 @@ func printProgress(current, total int, changes uint) {
     }
     fmt.Printf("] %.2f%% (%d/%d) Changes: %d", fraction*100.0, current, total, changes)
 }
-// temporary
 
-// func comb(n, k int) int {
-// 	if k < 0 || k > n || n > 25 {
-// 		return 0
-// 	}
-// 	if k == 0 || k == n {
-// 		return 1
-// 	}
-// 	// For efficiency, do k = min(k, n-k)
-// 	if k > n - k {
-// 		k = n - k
-// 	}
-// 	result := 1
-// 	for i := 0; i < k; i++ {
-// 		result = result * (n - i) / (i + 1)
-// 	}
-// 	return result
-// }
-
-
-// comb is a convenience wrapper around binomialTable
 func comb(n, k int) int {
-	if k < 0 || k > n || n < 0 || n > 25 {
+	if k < 0 || k > n || n > 25 {
 		return 0
 	}
-	return binomialTable[n][k]
+	if k == 0 || k == n {
+		return 1
+	}
+	// For efficiency, do k = min(k, n-k)
+	if k > n - k {
+		k = n - k
+	}
+	result := 1
+	for i := 0; i < k; i++ {
+		result = result * (n - i) / (i + 1)
+	}
+	return result
 }
 
 func arrayToBitboard(pos []int) bitboard {
