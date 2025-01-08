@@ -57,12 +57,14 @@ func navigateBoard(x, y *int) bool {
             *x--
             // Move cursor ~6 columns left
             fmt.Print("\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D")
+			
         }
     case KeyArrowRight:
         if *x < 4 {
             *x++
             // Move cursor ~6 columns right
             fmt.Print("\x1b[C\x1b[C\x1b[C\x1b[C\x1b[C\x1b[C")
+			
         }
     case KeyEnter:
         return true
@@ -113,13 +115,13 @@ func moveCursorFromCenterTo(x, y int) {
 // printTeeko prints the board, optionally highlighting a specific bit (for a selected marker).
 // We use "\u001b[46;1m" (cyan background) for the highlighted marker (Black or Red).
 // -------------------------------------------------------------------
-func printTeeko(game Teeko, highlight bitboard) {
+func printTeeko(game Teeko, selected_marker bitboard) {
     const vertical_separator = "\u001b[36m|"
     const horizontal_separator = "\u001b[36m-------------------------------------"
 
+    // First, figure out which squares belong to "black" vs "red"
     var black bitboard
     var red bitboard
-
     if game.current_player == BlackToMove {
         black = game.player_positions
         red = game.player_positions ^ game.occupied_positions
@@ -128,50 +130,97 @@ func printTeeko(game Teeko, highlight bitboard) {
         red = game.player_positions
     }
 
+    // Compute all squares that the selected_marker can move to (highlight_destinations).
+    // We'll only do this if there is a selected_marker.
+    var highlight_destinations bitboard
+    if selected_marker != 0 {
+        // Look at all possible moves
+        all_moves := game.possibleMoves()
+        for _, mv := range all_moves {
+            // If this move includes our selected_marker bit
+            // then it means the old square is selected_marker
+            // and the new square is mv ^ selected_marker.
+            // We'll add that new square to 'highlight_destinations'.
+            if (mv & selected_marker) == selected_marker {
+                new_square := mv ^ selected_marker
+                // Typically valid moves are to empty squares only,
+                // but you can check if it's indeed empty if you want:
+                // if (game.occupied_positions & new_square) == 0 {
+                //     highlight_destinations |= new_square
+                // }
+                highlight_destinations |= new_square
+            }
+        }
+    }
+
+    // Now print the board
     var row bitboard = BOARD_LENGTH
     for row != 0 {
         fmt.Print(horizontal_separator, "\n")
         fmt.Print(vertical_separator, "  ", row, "  ")
+
         var column bitboard = 1
         for column <= BOARD_LENGTH {
             fmt.Print(vertical_separator)
 
             index := (column - 1)*BOARD_LENGTH + (row - 1)
-            mask := bitboard(1) << index
-            is_highlight := (highlight & mask) != 0
+            square_bit := bitboard(1) << index
+
+            // Check if this square is the 'selected_marker'
+            is_selected_marker := (selected_marker & square_bit) != 0
+            // Check if this square is in highlight_destinations
+            is_destination := (highlight_destinations & square_bit) != 0
+
+            // Check if black or red is occupying this square
+            is_black := (black & square_bit) != 0
+            is_red   := (red   & square_bit) != 0
 
             switch {
-            case (black & mask) != 0:
-                if is_highlight {
-                    // Selected black marker => cyan background
-                    fmt.Print(" \u001b[46;1m \u001b[46;1mB \u001b[0m ")
+            // 1) Square belongs to black
+            case is_black:
+                if is_selected_marker {
+                    // Highlighted black piece => cyan background
+                    fmt.Print(" \u001b[46;1m \u001b[30;1mB \u001b[0m ")
                 } else {
-                    fmt.Print("  \u001b[30;1mB\u001b[0m  ")
+                    fmt.Print("  \u001b[30;1mB \u001b[0m ")
                 }
-            case (red & mask) != 0:
-                if is_highlight {
-                    // Selected red marker => cyan background
-					
-					fmt.Print(" \u001b[46;1m \u001b[31;1mR \u001b[0m ")
-				} else {
-                    fmt.Print("  \u001b[31;1mR\u001b[0m  ")
+
+            // 2) Square belongs to red
+            case is_red:
+                if is_selected_marker {
+                    // Highlighted red piece => cyan background
+                    fmt.Print(" \u001b[46;1m \u001b[31;1mR \u001b[0m ")
+                } else {
+                    fmt.Print("  \u001b[31;1mR \u001b[0m ")
                 }
+
+            // 3) Square is empty
             default:
-                if is_highlight {
-                    // For empty highlighted square
-                    fmt.Print("  \u001b[43;1m-\u001b[0m  ")
+                if is_selected_marker {
+                    // If for some reason the selected_marker is on an empty square
+                    // (shouldn't happen if selected_marker is truly a piece),
+                    // we could do a special highlight. Let's keep consistent:
+                    fmt.Print(" \u001b[46;1m \u001b[0m ")
+                } else if is_destination {
+                    // This is one of the squares the selected_marker can move to
+                    // Print a purple "+" to indicate a valid move destination
+                    fmt.Print("  \u001b[35;1m+ \u001b[0m ")
                 } else {
+                    // Normal empty square
                     fmt.Print("  -  ")
                 }
             }
+
             column++
         }
         fmt.Print(vertical_separator, "\n")
         row--
     }
+
+    // Print the bottom border
     fmt.Print(horizontal_separator, "\n")
 
-    // Print column headers
+    // Column headers
     fmt.Print(vertical_separator, "  0  ")
     for colIdx := bitboard(1); colIdx <= BOARD_LENGTH; colIdx++ {
         fmt.Print(vertical_separator)
@@ -189,11 +238,11 @@ func printTeeko(game Teeko, highlight bitboard) {
 // 3) Prints evaluation and instructions
 // 4) Moves cursor up & right near the center (like your original).
 // -------------------------------------------------------------------
-func printBoardWithInfo(game Teeko, marker bitboard) {
+func printBoardWithInfo(game Teeko, selected_marker bitboard) {
     fmt.Print("\033[H\033[2J") // Clear screen
 
     // Print board with no highlight
-    printTeeko(game, marker)
+    printTeeko(game, selected_marker)
     // Print evaluation
     // Phase-based instructions
     var player_text string
@@ -214,7 +263,6 @@ func printBoardWithInfo(game Teeko, marker bitboard) {
 			// score == 0 => no forced result either way
 			fmt.Println("No forced win.")
 	}
-	
 
     if game.phase() == DropPhase {
         fmt.Printf("%s, use arrow-keys to pick a drop; ENTER to confirm.\n", player_text)
@@ -231,17 +279,97 @@ func printBoardWithInfo(game Teeko, marker bitboard) {
 }
 
 func computerMove(game *Teeko) {
-	if game.phase() == DropPhase {
-		var drop bitboard = bestDrop(*game)
-		game.dropMarker(drop) 
-	} else {
-		var move bitboard = bestMove(*game)
-		game.moveMarker(move) 
-	}
+    // If evaluate(*game) == 0 => TIE
+    if evaluate(*game) == TIE {
+        // We'll do a shallow lookahead approach
+        if game.phase() == DropPhase {
+            var best_drop bitboard
+            var best_sum int = -1000000
+
+            // Consider each drop
+            drops := game.possibleDrops()
+            for _, drop := range drops {
+                child_game := *game
+                child_game.dropMarker(drop)
+
+				if evaluate(child_game) != TIE {
+					continue
+				}
+
+                // Now it's opponent's turn
+                opponent_moves := child_game.possibleMoves()
+                var sum_win_moves int = 0
+                for _, opponent_move := range opponent_moves {
+                    opponent_child := child_game
+                    opponent_child.moveMarker(opponent_move)
+
+                    opponent_score := evaluate(opponent_child)
+
+                    // If opponent_score < 0 => opponent is losing
+                    if opponent_score < 0 {
+                        // Add (WIN + negative_score)
+                        sum_win_moves += int(WIN - opponent_score)
+                    }
+                }
+                if sum_win_moves > best_sum {
+                    best_sum = sum_win_moves
+                    best_drop = drop
+                }
+				
+            }
+
+            // Perform best_drop
+            game.dropMarker(best_drop)
+
+        } else {
+            // MovePhase
+            var best_move_local bitboard
+            var best_sum int = -1000000
+
+            moves := game.possibleMoves()
+            for _, move_candidate := range moves {
+                child_game := *game
+                child_game.moveMarker(move_candidate)
+				
+				if evaluate(child_game) != TIE {
+					continue
+				}
+
+                opponent_moves := child_game.possibleMoves()
+                var sum_win_moves int = 0
+                for _, opponent_move := range opponent_moves {
+                    opponent_child := child_game
+                    opponent_child.moveMarker(opponent_move)
+
+                    opponent_score := evaluate(opponent_child)
+                    if opponent_score > 0 {
+                        sum_win_moves += int(WIN - opponent_score)
+                    }
+                }
+
+                if sum_win_moves > best_sum {
+                    best_sum = sum_win_moves
+                    best_move_local = move_candidate
+                }
+            }
+            game.moveMarker(best_move_local)
+        }
+    } else {
+        // Not TIE => use original bestDrop / bestMove
+        if game.phase() == DropPhase {
+            drop := bestDrop(*game)
+            game.dropMarker(drop)
+        } else {
+            move := bestMove(*game)
+            game.moveMarker(move)
+        }
+    }
 }
+
 
 func playerMove(game *Teeko) {
 	printBoardWithInfo(*game, 0)
+	
 
 	if game.phase() == DropPhase {
 		// ---------------- DROP PHASE ----------------
@@ -269,6 +397,7 @@ func playerMove(game *Teeko) {
 
 		for {
 			pressedEnter := navigateBoard(&cursorX, &cursorY)
+			
 			if pressedEnter {
 				mask := bitboard(1) << (uint32(cursorX)*uint32(BOARD_LENGTH) + uint32(cursorY))
 				cpPositions := game.player_positions
@@ -327,6 +456,8 @@ func playerMove(game *Teeko) {
 // main
 // -------------------------------------------------------------------
 func main() {
+    loadTable("book.txt")
+
     // 1) Clear screen at start
     fmt.Print("\033[H\033[2J\u001b[0m")
 
@@ -359,7 +490,7 @@ func main() {
     fmt.Print(">")
 
     // We'll keep track of the current line index = 0 => "Player vs Player", 1 => "Player vs AI"
-    currentLine := 0
+    current_line := 0
 
 MenuLoop:
     for {
@@ -373,7 +504,7 @@ MenuLoop:
         switch key {
         case keyboard.KeyArrowUp:
             // If we're not already at lineIndex=0, move cursor up
-            if currentLine > 0 {
+            if current_line > 0 {
                 // Remove ">" from old line by overwriting with a space
                 fmt.Print("\r")      // move to start of the current line
                 fmt.Print(" ")       // overwrite ">"
@@ -383,12 +514,12 @@ MenuLoop:
                 fmt.Print("\r")
                 // Print ">"
                 fmt.Print(">")
-                currentLine--
+                current_line--
             }
 
         case keyboard.KeyArrowDown:
             // If we're not already at lineIndex=1, move cursor down
-            if currentLine < 1 {
+            if current_line < 1 {
                 // Remove ">" from old line
                 fmt.Print("\r")
                 fmt.Print(" ")
@@ -398,7 +529,7 @@ MenuLoop:
                 fmt.Print("\r")
                 // Print ">"
                 fmt.Print(">")
-                currentLine++
+                current_line++
             }
 
         case keyboard.KeyEnter:
@@ -414,10 +545,9 @@ MenuLoop:
     fmt.Print("\033[H\033[2J\u001b[0m")
 
     // Decide mode based on lineIndex: 0 => PvP, 1 => PvAI
-    mode := currentLine
+    mode := current_line
 
     // 4) Load Teeko table, create the game
-    loadTable("book.txt")
     game := makeTeeko()
 
     // 5) Main game loop
