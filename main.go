@@ -327,88 +327,115 @@ func playerMove(game *Teeko) {
 // main
 // -------------------------------------------------------------------
 func main() {
-	loadTable("book.txt")
-
-    // 1) Clear screen
+    // 1) Clear screen at start
     fmt.Print("\033[H\033[2J\u001b[0m")
 
-    // 2) Initialize keyboard for arrow-key usage
+    // 2) Open keyboard for arrow key usage
     if err := keyboard.Open(); err != nil {
         fmt.Println("Cannot open keyboard:", err)
         os.Exit(1)
     }
     defer keyboard.Close()
 
-    // 3) Prepare two menu items for arrow-key selection
-    menuItems := []string{"Player vs Player", "Player vs AI"}
-    selectedIndex := 0
+    // 3) Print the menu exactly once
+    fmt.Print("Select Game Mode (use arrow keys, ENTER to confirm):\n")
+    fmt.Print("  - Player vs Player\n")
+    fmt.Print("  - Player vs Computer")
 
-    // A small function to print the menu with highlight
-    printMenu := func() {
-        fmt.Print("\033[H\033[2J\u001b[0m") // Clear screen each time we reprint
-        fmt.Println("Select Game Mode (use arrow keys, ENTER to confirm):\n")
-        for i, item := range menuItems {
-            if i == selectedIndex {
-                // Print highlighted item => e.g. "[ Player vs Player ]"
-                fmt.Printf("\u001b[46;1m%s\u001b[0m\n", item)
-            } else {
-                fmt.Println(item)
-            }
-        }
-        fmt.Println()
-    }
+    /*
+       After printing, the cursor is now at the end of line 4 (the " - Player vs AI").
+       We want our ">" cursor to start on line 3, left column 0, meaning next to " - Player vs Player".
+       We'll track lines like this:
+           lineIndex = 0 => row 3 (the "  - Player vs Player")
+           lineIndex = 1 => row 4 (the "  - Player vs AI")
+    */
 
-    // Print the menu initially
-    printMenu()
+    // Move the cursor up from line 4 to line 3
+    fmt.Print("\x1b[A") // Move up 1 line (from row 4 => row 3)
+    // Move cursor all the way to column 0
+    fmt.Print("\r")
+
+    // Print ">" at the start of line 3
+    fmt.Print(">")
+
+    // We'll keep track of the current line index = 0 => "Player vs Player", 1 => "Player vs AI"
+    currentLine := 0
 
 MenuLoop:
     for {
+        // Read a key
         _, key, err := keyboard.GetKey()
         if err != nil {
             fmt.Println("Error reading key:", err)
             break
         }
+
         switch key {
         case keyboard.KeyArrowUp:
-            if selectedIndex > 0 {
-                selectedIndex--
+            // If we're not already at lineIndex=0, move cursor up
+            if currentLine > 0 {
+                // Remove ">" from old line by overwriting with a space
+                fmt.Print("\r")      // move to start of the current line
+                fmt.Print(" ")       // overwrite ">"
+                // Move up one line
+                fmt.Print("\x1b[A")
+                // Move to col 0 again
+                fmt.Print("\r")
+                // Print ">"
+                fmt.Print(">")
+                currentLine--
             }
+
         case keyboard.KeyArrowDown:
-            if selectedIndex < len(menuItems)-1 {
-                selectedIndex++
+            // If we're not already at lineIndex=1, move cursor down
+            if currentLine < 1 {
+                // Remove ">" from old line
+                fmt.Print("\r")
+                fmt.Print(" ")
+                // Move down one line
+                fmt.Print("\x1b[B")
+                // Move to col 0
+                fmt.Print("\r")
+                // Print ">"
+                fmt.Print(">")
+                currentLine++
             }
+
         case keyboard.KeyEnter:
             // Confirm selection
             break MenuLoop
+
+        default:
+            // Ignore other keys
         }
-        // Reprint menu after changing selection
-        printMenu()
     }
 
-    // Now we have either index=0 => "Player vs Player" or index=1 => "Player vs AI"
-    mode := selectedIndex // 0 or 1
+    // Clear the screen after menu
+    fmt.Print("\033[H\033[2J\u001b[0m")
 
-    // 4) Load the table for your Teeko game
+    // Decide mode based on lineIndex: 0 => PvP, 1 => PvAI
+    mode := currentLine
 
-    // 5) Initialize the game
+    // 4) Load Teeko table, create the game
+    loadTable("book.txt")
     game := makeTeeko()
 
-    // 6) Game loop
+    // 5) Main game loop
     for !game.isWin() {
         if mode == 0 {
-            // 0 => Player vs Player
-            playerMove(&game) // both sides always use playerMove
+            // Player vs Player
+            playerMove(&game)
         } else {
-            // 1 => Player vs AI
+            // Player vs AI
             if game.current_player == BlackToMove {
-                playerMove(&game)   // Black is human
+                playerMove(&game)
             } else {
-                computerMove(&game) // Red is AI
+                computerMove(&game)
             }
         }
     }
 
-    // 7) Game finished => final output
+    // 6) Game is finished => print final board & winner
     fmt.Print("\033[H\033[2J\u001b[0m")
     printTeeko(game, 0)
     fmt.Printf("Game Over! Winner is: %s\n", func() string {
@@ -421,4 +448,3 @@ MenuLoop:
     // Final reset
     fmt.Print("\u001b[0m")
 }
-

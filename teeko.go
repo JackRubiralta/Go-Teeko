@@ -1,7 +1,5 @@
 package main
-import (
-	"fmt"
-)
+
 // bitboard for storing piece positions
 type bitboard uint32
 type GameMode int
@@ -267,63 +265,3 @@ func (game *Teeko) possibleDrops() []bitboard {
 	return possible_drops
 }
 
-
-func (game *Teeko) printBoard() {
-	const vertical_separator string = "\u001b[36m|"
-	const horizontal_separator string = "\u001b[36m-------------------------------------"
-
-	var black bitboard
-	var red bitboard
-
-	// If current_player == BlackToMove, then game.player_positions holds black's squares
-	// and red squares = player_positions ^ occupied_positions.
-	// Otherwise, it's reversed.
-	if game.current_player == BlackToMove {
-		black = game.player_positions
-		red = game.player_positions ^ game.occupied_positions
-	} else {
-		black = game.player_positions ^ game.occupied_positions
-		red = game.player_positions
-	}
-
-	var row bitboard
-	row = BOARD_LENGTH
-	for row != 0 {
-		fmt.Print(horizontal_separator, "\n")
-		fmt.Print(vertical_separator, "  ", row, "  ")
-		var column bitboard
-		column = 1
-		for column <= BOARD_LENGTH {
-			fmt.Print(vertical_separator)
-
-			var index bitboard
-			index = (column-1)*BOARD_LENGTH + (row - 1)
-
-			if ((1 << index) & black) != 0 {
-				fmt.Print("  ", "\u001b[30;1mB", "  ")
-			} else if ((1 << index) & red) != 0 {
-				fmt.Print("  ", "\u001b[31;1mR", "  ")
-			} else {
-				fmt.Print("  ", "\u001b[0m-", "  ")
-			}
-
-			column++
-		}
-		fmt.Print(vertical_separator, "\n")
-		row--
-	}
-	fmt.Print(horizontal_separator, "\n")
-
-	// Print the column headers
-	fmt.Print(vertical_separator, "  0  ")
-	var colIdx uint
-	colIdx = 1
-	for colIdx <= uint(BOARD_LENGTH) {
-		fmt.Print(vertical_separator)
-		fmt.Print("  ", colIdx, "  ")
-		colIdx++
-	}
-	fmt.Print(vertical_separator, "\n")
-	fmt.Print(horizontal_separator, "\n")
-	fmt.Print("\u001b[0m")
-}
