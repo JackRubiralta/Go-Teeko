@@ -1,9 +1,16 @@
 
-// to play
-go run main.go teeko.go encoder.go helper.go
 
-// to create book.txt
+To play 
+```sh
+go run main.go teeko.go encoder.go helper.go solver.go; ./main
+```
+
+To generate book
+```sh
 go build solver.go encoder.go teeko.go helper.go; ./solver
+```
 
-TODO
-in helper and in encoder bring back comb as just equatiin and remove pre set table 
+To unzip computed book
+```sh
+tar -xf book.zip
+```
